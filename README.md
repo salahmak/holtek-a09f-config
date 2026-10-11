@@ -109,7 +109,7 @@ The full write-up is in **[docs/PROTOCOL.md](docs/PROTOCOL.md)**.
   known factory-reset command; your backup is the way back.
 - **DPI cannot be configured.** The DPI table can be read, and bit 7 enabling/disabling a
   stage is confirmed, but changing a stage's value had no measurable effect on cursor speed.
-  The DPI table is read-only in this tool.
+  The DPI table is read-only in this tool. Measured sensitivity is ≈1100–1300 CPI on every stage.
 - **Effect parameters are raw.** What `p1`/`p2` mean (speed, brightness, length) depends on
   the effect and isn't fully mapped. Defaults come from vendor captures of this model. The
   mouse shipped with Neon at `01 03`, which does not match the captured `03 ff`.
@@ -129,8 +129,8 @@ The full write-up is in **[docs/PROTOCOL.md](docs/PROTOCOL.md)**.
 
 Contributions welcome, especially from owners of the other rebrands.
 
-- [ ] **DPI:** find how the stage byte maps to sensor DPI, or which other group sets it
-      (`03` = `02 0f d5 04` is a suspect).
+- [ ] **DPI:** likely fixed on this unit. Neither the DPI table (`11`) nor group `06` changed
+      the measured CPI. Needs a capture of the vendor software changing only DPI.
 - [x] Polling rate (group `01`), identified with help from the 2021 C-13 vendor software.
 - [ ] Measure 250 / 125 Hz polling, and confirm group `02` = active profile.
 - [ ] **Unknown groups** `03`, `0b`: probably lift-off distance,

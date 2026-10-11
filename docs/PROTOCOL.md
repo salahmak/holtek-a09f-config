@@ -81,6 +81,14 @@ a checksum. Groups with data also stream 32-byte **input reports** right after t
 | `03` | `02 0f d5 04` | `03 …` | ? Vendor reads it and writes it back unchanged every time | unknown |
 | `0B` | `02` | `0b xx` | ? Not the polling rate: the mouse polls at 1000 Hz with `02` | unknown |
 | `08` | — | `08 aa cc ee` | Vendor "save/commit" | not needed, never sent |
+| `00` | `02 39` | — | **Firmware version** (2.39 = USB bcdDevice) | **verified** (read) |
+| `04` | `30` | ? | unknown (the 2021 software uses `04` to select the DPI stage) | unknown |
+| `05` | `00` | ? | unknown | unknown |
+| `06` | `0a 0a 19 19` | ? | unknown; changing `19 19` → `32 32` had no measurable effect on DPI | unknown |
+| `07` | `00 03 05 05` | ? | unknown | unknown |
+| `09` | ⚠ | — | **Reading `89` stalls the config interface** (every later feature request fails with EPIPE) until the mouse is replugged. Don't send it. | observed |
+
+Groups `0a`–`0f` (other than the ones above) have not been probed.
 
 Page arguments only use bit 0 (`90 02` reads the same as `90 00`). `91` ignores its argument.
 
@@ -125,7 +133,9 @@ As found on the C-13: `07 08 c6 c8 cb 80 80 80`: two enabled stages (`07`, `08`)
 with bit 7 set are skipped when cycling. The Phoenix Void factory table is
 `08 10 18 30 60 7e 7e 78`. On the C-13, changing `07 08` to `08 10` made no measurable
 difference in cursor speed, even after a replug (measured about 1050–1280 counts/inch either way),
-so how the stage value maps to sensor DPI is still open.
+and changing group `06` had no effect either. The most likely explanation is that the sensor
+DPI on this unit is fixed (≈1100–1300 CPI measured on every stage) or is set by a command that
+appears in no available capture. A capture of the vendor software changing only DPI would settle it.
 
 ## Related: the 2021 Zelotes C-13 software
 
@@ -134,6 +144,14 @@ uses 64-byte output reports, but the same 8-byte command format and checksum, **
 scrambling. Its `Monitor.exe` sends `02 [profile+1]` (profile), `03 [profile+1] [8|4|2|1]`
 (polling rate as a divider), and `04 [profile+1] [value+1]`. The divider encoding is what
 identified group `01` above. Its `.gmp` profiles are INI files XOR-ed with `0x32`.
+
+Its DPI handling, for reference (it does **not** apply to the 04d9:a09f, see above):
+
+- **Stored:** 5 levels per axis, with CPI = level × 90.
+- **Encoded:** a 100-entry table converts each level to a sensor byte (≈39 CPI per step, and bit 7
+  selects a ×2 high range: level 100 → `0xf3`).
+- **Sent:** inside a 128-byte control page (`0c xx 80` + 2 × 64 bytes). `04 [profile+1] [stage+1]`
+  selects the active stage.
 
 ## Sources
 
