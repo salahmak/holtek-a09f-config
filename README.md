@@ -24,6 +24,7 @@ ID 04d9:a09f Holtek Semiconductor, Inc. E-Signal LUOM G10 Mechanical Gaming Mous
 - **Lighting:** effect (Off, Standard, Breathing, Neon, Wave, Key reaction, Trailing, Drag,
   Slide, Yo-yo, Marbles, Flying star), colour, raw effect parameters.
 - **Colour tables:** the 8-colour cycle palette and the 8 DPI-stage colours.
+- **Polling rate:** 1000 / 500 Hz (verified), 250 / 125 Hz (inferred).
 - **Button mapping** for right, wheel click, forward, back and DPI: mouse buttons, media
   keys (play/pause, next/previous, volume, mute, stop), DPI cycle/up/down, or disabled.
 - **Restore** lighting, colours and buttons from a backup.
@@ -82,6 +83,7 @@ exact bytes that will be written. Backups and restore are on the Device tab.
 ./a09fctl.py color ff8000               # static orange
 ./a09fctl.py mode neon --p1 3 --p2 255  # effect + raw parameters
 ./a09fctl.py palette dpi ff00ff ffff00 ff0000 0000ff 00ff00 8000ff ffffff ffffff
+./a09fctl.py polling 500                # polling rate in Hz
 ./a09fctl.py button dpi play-pause      # DPI button sends Play/Pause
 ./a09fctl.py button forward forward     # back to the factory function
 ./a09fctl.py restore-buttons ~/.local/share/holtek-a09f-config/backups/config-….json
@@ -116,8 +118,9 @@ The full write-up is in **[docs/PROTOCOL.md](docs/PROTOCOL.md)**.
   has been verified.
 - **The physical button layout is assumed.** Slot → physical button was mapped on the
   Zelotes C-13. Other shells may have different buttons in different slots.
-- **Not supported yet:** macros, the second button-map page, polling rate, lift-off
-  distance and anything else in the unknown settings groups `01`, `02`, `03`, `0b`.
+- **Not supported yet:** macros, the second button-map page, profiles, lift-off
+  distance and anything else in the unknown settings groups `02`, `03`, `0b`.
+  250 and 125 Hz polling are inferred from the vendor encoding but not measured yet.
 - **Neon** uses its own built-in colours, not the cycle palette. Which effects do use the
   palette hasn't been mapped yet.
 - **Linux only** (`hidraw`). Only one tool should talk to the mouse at a time.
@@ -128,7 +131,9 @@ Contributions welcome, especially from owners of the other rebrands.
 
 - [ ] **DPI:** find how the stage byte maps to sensor DPI, or which other group sets it
       (`03` = `02 0f d5 04` is a suspect).
-- [ ] **Unknown groups** `01`, `02`, `03`, `0b`: probably polling rate, lift-off distance,
+- [x] Polling rate (group `01`), identified with help from the 2021 C-13 vendor software.
+- [ ] Measure 250 / 125 Hz polling, and confirm group `02` = active profile.
+- [ ] **Unknown groups** `03`, `0b`: probably lift-off distance,
       angle snapping or debounce. They need a capture of the vendor software changing each
       setting individually.
 - [ ] Map **effect parameters** (speed/brightness ranges per effect) and which effects use the

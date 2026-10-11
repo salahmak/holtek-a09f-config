@@ -11,8 +11,8 @@ Protocol summary (details in docs/PROTOCOL.md):
     32-byte output reports.
   * Writes are stored in the mouse immediately; there is no separate save step.
 
-Only commands verified on real hardware are writable: 0x0C colour, 0x0D effect,
-0x10 colour tables, 0x12 button map. Every write prints its packets and asks for
+Only commands verified on real hardware are writable: 0x01 polling rate, 0x0C colour,
+0x0D effect, 0x10 colour tables, 0x12 button map. Every write prints its packets and asks for
 confirmation unless --yes is given.
 """
 import argparse, datetime, fcntl, glob, json, os, sys, time
@@ -41,6 +41,9 @@ MODES = {
     'flying-star':  (0x0B, 0xFF, 0x00),
 }
 MODE_NAMES = {v[0]: k for k, v in MODES.items()}
+# Group 0x01: polling-rate divider (rate = 1000 Hz / divider). 1000 and 500 measured; 250/125 inferred.
+POLLING = {1000: 1, 500: 2, 250: 4, 125: 8}
+POLLING_VERIFIED = (1000, 500)
 READ_GROUPS = [(0x81, 0), (0x82, 0), (0x83, 0), (0x8B, 0), (0x8C, 0), (0x8D, 0),
                (0x90, 0), (0x90, 1), (0x91, 0), (0x92, 0), (0x92, 1), (0x92, 2)]
 DATA_LEN = {0x90: 32, 0x91: 32, 0x92: 64}   # read groups that also stream input reports
@@ -241,6 +244,8 @@ def describe(cfg):
     print(f'key           {cfg["key"]}')
     print(f'colour        #{c[0]:02x}{c[1]:02x}{c[2]:02x}')
     print(f'effect        {MODE_NAMES.get(md[0], hex(md[0]))}  (params {md[1]:#04x} {md[2]:#04x})')
+    div = bytes.fromhex(cfg['81:0']['reply'])[0]
+    print(f'polling rate  {1000 // div if div else "?"} Hz  (divider {div})')
 
     def rgb_list(h):
         b = bytes.fromhex(h)[:24]
@@ -257,7 +262,7 @@ def describe(cfg):
             continue
         name = {1: MOUSE_CODES, 3: CONSUMER_CODES, 7: DPI_CODES}.get(t, {}).get(code, f'{code:#04x}')
         print(f'  slot {i // 4 + 1:2d} {phys.get(i // 4 + 1, ""):8s}: {BUTTON_TYPES.get(t, f"type {t:#04x}")} {name}')
-    for k in ('81:0', '82:0', '83:0', '8b:0'):
+    for k in ('82:0', '83:0', '8b:0'):
         print(f'group {k[:2]}      {cfg[k]["reply"]}  (unknown)')
 
 
@@ -306,6 +311,9 @@ def main():
     pa.add_argument('table', choices=('cycle', 'dpi'))
     pa.add_argument('colors', nargs=8, metavar='RRGGBB')
     pa.add_argument('--yes', action='store_true')
+    po = sub.add_parser('polling', help='set the polling rate in Hz (1000/500 verified, 250/125 inferred)')
+    po.add_argument('hz', type=int, choices=sorted(POLLING, reverse=True))
+    po.add_argument('--yes', action='store_true')
     bt = sub.add_parser('button', help='remap a button, e.g. button dpi play-pause')
     bt.add_argument('button', choices=SLOTS)
     bt.add_argument('action', choices=ACTIONS)
@@ -347,6 +355,15 @@ def main():
             if not (0 <= p1 <= 255 and 0 <= p2 <= 255):
                 sys.exit('parameters must be 0..255')
             confirm_and_write(m, [packet(0x0D, v, p1, p2)], a.yes)
+        elif a.cmd == 'polling':
+            if a.hz not in POLLING_VERIFIED:
+                print(f'note: {a.hz} Hz is inferred from the vendor encoding, not yet measured on hardware')
+            p = packet(0x01, POLLING[a.hz])
+            print(f'  {p.hex(" ")}   (wire {m.wire(p).hex(" ")})')
+            ask(a.yes)
+            m.send(p)
+            div = m.read(0x81)[0][0]
+            print('VERIFIED' if div == POLLING[a.hz] else f'MISMATCH, divider reads {div}')
         elif a.cmd == 'palette':
             page = 0 if a.table == 'cycle' else 1
             new = b''.join(bytes.fromhex(c.lstrip('#')) for c in a.colors)

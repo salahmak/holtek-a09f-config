@@ -180,6 +180,10 @@ class Window(Adw.ApplicationWindow):
             row.set_subtitle(cfg[k]['reply'][:8])
         self.path_row.set_subtitle(g.find_config_hidraw() or '—')
         self.key_row.set_subtitle(cfg['key'])
+        div = bytes.fromhex(cfg['81:0']['reply'])[0]
+        rate = {v: k for k, v in g.POLLING.items()}.get(div)
+        if rate:
+            self.poll_row.set_selected(self.poll_rates.index(rate))
         self.populating = False
         self.root.set_visible_child_name('main')
         self.set_busy(False)
@@ -324,6 +328,16 @@ class Window(Adw.ApplicationWindow):
     # ---------------------------------------------------------------- device
     def build_device(self):
         page = Adw.PreferencesPage()
+        perf = Adw.PreferencesGroup(title='Performance')
+        perf.set_header_suffix(self.apply_button('Apply', self.on_apply_polling))
+        self.poll_rates = sorted(g.POLLING, reverse=True)
+        self.poll_row = Adw.ComboRow(
+            title='Polling rate', subtitle='250 and 125 Hz are inferred, not yet measured',
+            model=Gtk.StringList.new([f'{hz} Hz' + ('' if hz in g.POLLING_VERIFIED else ' (inferred)')
+                                      for hz in self.poll_rates]))
+        perf.add(self.poll_row)
+        page.add(perf)
+
         grp = Adw.PreferencesGroup(title='Configuration')
         backup = Adw.ButtonRow(title='Back up to file', start_icon_name='document-save-symbolic')
         backup.connect('activated', self.on_backup)
@@ -342,17 +356,34 @@ class Window(Adw.ApplicationWindow):
         info.add(self.path_row)
         self.key_row = Adw.ActionRow(title='Scramble key', subtitle='—', subtitle_selectable=True)
         info.add(self.key_row)
-        info.add(Adw.ActionRow(title='Polling rate', subtitle='1000 Hz (measured)'))
         self.dpi_row = Adw.ActionRow(title='DPI table (raw)')
         info.add(self.dpi_row)
         self.group_rows = {}
-        for k in ('81:0', '82:0', '83:0', '8b:0'):
+        for k in ('82:0', '83:0', '8b:0'):
             r = Adw.ActionRow(title=f'Group {k[:2]}', subtitle_selectable=True)
             r.add_css_class('property')
             self.group_rows[k] = r
             info.add(r)
         page.add(info)
         self.stack.add_titled_with_icon(page, 'device', 'Device', 'preferences-system-symbolic')
+
+    def on_apply_polling(self, *_):
+        hz = self.poll_rates[self.poll_row.get_selected()]
+        div = g.POLLING[hz]
+        if bytes.fromhex(self.cfg['81:0']['reply'])[0] == div:
+            self.toast('Nothing changed')
+            return
+        p = g.packet(0x01, div)
+
+        def write(m):
+            m.send(p)
+            return m.read(0x81)[0][0]
+
+        def done(back):
+            self.toast(f'Polling rate set to {hz} Hz' if back == div else f'Read-back mismatch: divider {back}')
+            self.load()
+        self.confirm('Change polling rate?', f'{hz} Hz (divider {div}).',
+                     [f'{p.hex(" ")}\n    wire {g.scramble(p, self.key).hex(" ")}'], write, done)
 
     def on_backup(self, *_):
         def done(cfg):

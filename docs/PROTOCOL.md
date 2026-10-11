@@ -76,8 +76,8 @@ a checksum. Groups with data also stream 32-byte **input reports** right after t
 | `11` | `05 08` + 32 B | `11 05 08` + 32 B | DPI table, 1 byte per stage, bit 7 = stage disabled | stage enable **verified**; value encoding **unknown** |
 | `12` page 1 | `01 40` + 64 B | `12 01 40` + 2 × 32 B | Button map (pages 0 and 1 read identically) | **verified** |
 | `12` page 2 | `02 40` + 64 B | `12 02 40` | Second map, all zero here; the vendor software writes it too | unknown |
-| `01` | `01` | `01 xx` | ? (Ardor writes `01 02`, Phoenix `01 01`) | unknown |
-| `02` | `01` | `02 xx` | ? | unknown |
+| `01` | `01` | `01 div` | **Polling rate** = 1000 Hz / div (`01` 1000, `02` 500, `04` 250, `08` 125) | **verified** for 1000/500 (measured); 250/125 inferred |
+| `02` | `01` | `02 n` | Active profile, 1-based? (the 2021 C-13 software sends `02 [profile+1]`) | hypothesis |
 | `03` | `02 0f d5 04` | `03 …` | ? Vendor reads it and writes it back unchanged every time | unknown |
 | `0B` | `02` | `0b xx` | ? Not the polling rate: the mouse polls at 1000 Hz with `02` | unknown |
 | `08` | — | `08 aa cc ee` | Vendor "save/commit" | not needed, never sent |
@@ -126,6 +126,14 @@ with bit 7 set are skipped when cycling. The Phoenix Void factory table is
 `08 10 18 30 60 7e 7e 78`. On the C-13, changing `07 08` to `08 10` made no measurable
 difference in cursor speed, even after a replug (measured about 1050–1280 counts/inch either way),
 so how the stage value maps to sensor DPI is still open.
+
+## Related: the 2021 Zelotes C-13 software
+
+The vendor software for the newer (2021) C-13 targets a different controller (USB `1017:9116`) and
+uses 64-byte output reports, but the same 8-byte command format and checksum, **without**
+scrambling. Its `Monitor.exe` sends `02 [profile+1]` (profile), `03 [profile+1] [8|4|2|1]`
+(polling rate as a divider), and `04 [profile+1] [value+1]`. The divider encoding is what
+identified group `01` above. Its `.gmp` profiles are INI files XOR-ed with `0x32`.
 
 ## Sources
 
