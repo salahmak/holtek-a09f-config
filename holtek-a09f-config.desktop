@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Holtek A09F Mouse
+Comment=Lighting, colours and buttons for Holtek 04d9:a09f gaming mice
+Exec=a09f-gui
+Icon=input-mouse
+Categories=Settings;HardwareSettings;
+StartupWMClass=io.github.salahmak.HoltekA09FConfig

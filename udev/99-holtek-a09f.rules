@@ -1,0 +1,3 @@
+# Holtek 04d9:a09f gaming mice (Zelotes C-13, E-Signal LUOM G10, ...):
+# give the logged-in desktop user access to the mouse's hidraw nodes.
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="04d9", ATTRS{idProduct}=="a09f", TAG+="uaccess"
